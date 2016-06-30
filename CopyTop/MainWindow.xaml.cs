@@ -9,11 +9,42 @@ namespace CopyTop
     {
         private static readonly string RegAutostartName = "CopyTop";
         private System.Windows.Forms.MenuItem _OnTop;
+        private System.Threading.Mutex _Mutex;
 
         public MainWindow()
         {
-            CreateNotifyIcon(CreateNotifyMenu());
-            CreateTimer();
+            var _MutexCreated_ = false;
+
+            try
+            {
+                _Mutex = new System.Threading.Mutex(true, RegAutostartName, out _MutexCreated_);
+                Application.Current.Exit += (sender, e) => {
+                    if (_Mutex != null)
+                    {
+                        if (_Mutex.WaitOne(1000))
+                            _Mutex.ReleaseMutex();
+
+                        _Mutex.Close();
+                        _Mutex = null;
+                    }
+                };
+            }
+            catch
+            {
+                _MutexCreated_ = false;
+            }
+
+            if (!_MutexCreated_)
+            {
+                Application.Current.Shutdown();
+            }
+            else
+            {
+                _Mutex.WaitOne();
+
+                CreateNotifyIcon(CreateNotifyMenu());
+                CreateTimer();
+            }
         }
 
         private void CreateTimer()
