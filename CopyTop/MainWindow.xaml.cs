@@ -8,42 +8,49 @@ namespace CopyTop
     public partial class MainWindow : Window
     {
         private static readonly string RegAutostartName = "CopyTop";
+        private static readonly string RegPath = @"Microsoft\Windows\CurrentVersion\Run";
         private System.Windows.Forms.MenuItem _OnTop;
-        private System.Threading.Mutex _Mutex;
 
         public MainWindow()
+        {
+            if (!CreateMutex())
+                Application.Current.Shutdown();
+            else
+            {
+                CreateNotifyIcon(CreateNotifyMenu());
+                CreateTimer();
+            }
+        }
+
+        private bool CreateMutex()
         {
             var _MutexCreated_ = false;
 
             try
             {
-                _Mutex = new System.Threading.Mutex(true, RegAutostartName, out _MutexCreated_);
-                Application.Current.Exit += (sender, e) => {
-                    if (_Mutex != null)
+                var _Mutex_ = new System.Threading.Mutex(true, RegAutostartName, out _MutexCreated_);
+                if (_MutexCreated_)
+                {
+                    Application.Current.Exit += (sender, e) =>
                     {
-                        if (_Mutex.WaitOne(1000))
-                            _Mutex.ReleaseMutex();
+                        if (_Mutex_ != null)
+                        {
+                            if (_Mutex_.WaitOne(1000))
+                                _Mutex_.ReleaseMutex();
 
-                        _Mutex.Close();
-                        _Mutex = null;
-                    }
-                };
+                            _Mutex_.Close();
+                            _Mutex_ = null;
+                        }
+                    };
+
+                    _Mutex_.WaitOne();
+                }
+
+                return _MutexCreated_;
             }
             catch
             {
-                _MutexCreated_ = false;
-            }
-
-            if (!_MutexCreated_)
-            {
-                Application.Current.Shutdown();
-            }
-            else
-            {
-                _Mutex.WaitOne();
-
-                CreateNotifyIcon(CreateNotifyMenu());
-                CreateTimer();
+                return false;
             }
         }
 
@@ -98,63 +105,49 @@ namespace CopyTop
             Application.Current.Exit += (sender, e) => { _TrayIcon_.Visible = false; _TrayIcon_.Dispose(); };
         }
 
-        private static string RegRead(string KeyName)
+        private static T UseReg<T>(Func<Microsoft.Win32.RegistryKey, T> Worker)
         {
             using (var _CurrentUser_ = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.CurrentUser, Microsoft.Win32.RegistryView.Registry64))
-            using (var _SubKey_ = _CurrentUser_.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run"))
+            using (var _SubKey_ = _CurrentUser_.OpenSubKey(@"SOFTWARE\" + RegPath, true))
             {
                 if (_SubKey_ == null)
-                    return string.Empty;
+                    return default(T);
 
                 try
                 {
-                    return (string)_SubKey_.GetValue(KeyName);
+                    return Worker(_SubKey_);
                 }
                 catch
                 {
-                    return string.Empty;
+                    return default(T);
                 }
             }
+        }
+
+        private static string RegRead(string KeyName)
+        {
+            return UseReg((SubKey) =>
+            {
+                return (string)SubKey.GetValue(KeyName);
+            });
         }
 
         private static bool RegWrite(string KeyName, string Value)
         {
-            using (var _CurrentUser_ = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.CurrentUser, Microsoft.Win32.RegistryView.Registry64))
-            using (var _SubKey_ = _CurrentUser_.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
+            return UseReg((SubKey) =>
             {
-                if (_SubKey_ == null)
-                    return false;
-
-                try
-                {
-                    _SubKey_.SetValue(KeyName, Value);
-                    return true;
-                }
-                catch
-                {
-                    return false;
-                }
-            }
+                SubKey.SetValue(KeyName, Value);
+                return true;
+            });
         }
 
         private static bool RegDelete(string KeyName)
         {
-            using (var _CurrentUser_ = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.CurrentUser, Microsoft.Win32.RegistryView.Registry64))
-            using (var _SubKey_ = _CurrentUser_.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
+            return UseReg((SubKey) =>
             {
-                if (_SubKey_ == null)
-                    return false;
-
-                try
-                {
-                    _SubKey_.DeleteValue(KeyName);
-                    return true;
-                }
-                catch
-                {
-                    return false;
-                }
-            }
+                SubKey.DeleteValue(KeyName);
+                return true;
+            });
         }
 
         private static bool IsAutostart
