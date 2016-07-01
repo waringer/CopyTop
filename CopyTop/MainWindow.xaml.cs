@@ -7,8 +7,6 @@ namespace CopyTop
 {
     public partial class MainWindow : Window
     {
-        private static readonly string RegAutostartName = "CopyTop";
-        private static readonly string RegPath = @"Microsoft\Windows\CurrentVersion\Run";
         private System.Windows.Forms.MenuItem _OnTop;
 
         public MainWindow()
@@ -22,13 +20,13 @@ namespace CopyTop
             }
         }
 
-        private bool CreateMutex()
+        private static bool CreateMutex()
         {
             var _MutexCreated_ = false;
 
             try
             {
-                var _Mutex_ = new System.Threading.Mutex(true, RegAutostartName, out _MutexCreated_);
+                var _Mutex_ = new System.Threading.Mutex(true, System.Reflection.Assembly.GetExecutingAssembly().Location.Replace(@"\", string.Empty), out _MutexCreated_);
                 if (_MutexCreated_)
                 {
                     Application.Current.Exit += (sender, e) =>
@@ -88,11 +86,11 @@ namespace CopyTop
         {
             var _trayMenu_ = new System.Windows.Forms.ContextMenu();
             _OnTop = _trayMenu_.MenuItems.Add("On Top", (sender, e) => { (sender as System.Windows.Forms.MenuItem).Checked = !(sender as System.Windows.Forms.MenuItem).Checked; });
-            var _AutoStart_ = _trayMenu_.MenuItems.Add("Autostart", (sender, e) => { (sender as System.Windows.Forms.MenuItem).Checked = !(sender as System.Windows.Forms.MenuItem).Checked; IsAutostart = (sender as System.Windows.Forms.MenuItem).Checked; });
+            var _AutoStart_ = _trayMenu_.MenuItems.Add("Autostart", (sender, e) => { (sender as System.Windows.Forms.MenuItem).Checked = !(sender as System.Windows.Forms.MenuItem).Checked; RegistryTools.IsAutostart = (sender as System.Windows.Forms.MenuItem).Checked; });
             _trayMenu_.MenuItems.Add("Exit", (sender, e) => { Application.Current.Shutdown(); });
 
             _OnTop.Checked = true;
-            _AutoStart_.Checked = IsAutostart;
+            _AutoStart_.Checked = RegistryTools.IsAutostart;
 
             return _trayMenu_;
         }
@@ -104,11 +102,17 @@ namespace CopyTop
 
             Application.Current.Exit += (sender, e) => { _TrayIcon_.Visible = false; _TrayIcon_.Dispose(); };
         }
+    }
+
+    internal static class RegistryTools
+    {
+        private static readonly string RegAutostartName = "CopyTop";
+        private static readonly string RegPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
 
         private static T UseReg<T>(Func<Microsoft.Win32.RegistryKey, T> Worker)
         {
             using (var _CurrentUser_ = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.CurrentUser, Microsoft.Win32.RegistryView.Registry64))
-            using (var _SubKey_ = _CurrentUser_.OpenSubKey(@"SOFTWARE\" + RegPath, true))
+            using (var _SubKey_ = _CurrentUser_.OpenSubKey(RegPath, true))
             {
                 if (_SubKey_ == null)
                     return default(T);
@@ -150,7 +154,7 @@ namespace CopyTop
             });
         }
 
-        private static bool IsAutostart
+        public static bool IsAutostart
         {
             get
             {
