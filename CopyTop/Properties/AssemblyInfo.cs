@@ -6,11 +6,11 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("CopyTop")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyDescription("Homepage : https://github.com/waringer/CopyTop")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Holger Wolff")]
 [assembly: AssemblyProduct("CopyTop")]
-[assembly: AssemblyCopyright("Copyright © Holger Wolff 2016")]
+[assembly: AssemblyCopyright("Copyright © Holger Wolff 2016 (BSD 3-clause license)")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -32,5 +32,5 @@ using System.Runtime.InteropServices;
 // You can specify all the values or you can default the Build and Revision Numbers 
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.0.7.0")]
-[assembly: AssemblyFileVersion("1.0.7.0")]
+[assembly: AssemblyVersion("1.0.8.0")]
+[assembly: AssemblyFileVersion("1.0.8.0")]
