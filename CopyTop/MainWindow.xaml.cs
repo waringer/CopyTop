@@ -2,15 +2,141 @@
 using System.Windows;
 using System.Drawing;
 using System.Runtime.InteropServices;
+using System.Reflection;
+using System.Windows.Input;
 
 namespace CopyTop
 {
     public partial class MainWindow : Window
     {
+        #region Form
+        private static readonly Type MyType = typeof(MainWindow);
+        private static readonly DependencyProperty ProductNameProperty = DependencyProperty.Register("ProductName", typeof(string), MyType, new FrameworkPropertyMetadata(string.Empty, null));
+        private static readonly DependencyProperty VersionProperty = DependencyProperty.Register("Version", typeof(string), MyType, new FrameworkPropertyMetadata(string.Empty, null));
+        private static readonly DependencyProperty CopyrightProperty = DependencyProperty.Register("Copyright", typeof(string), MyType, new FrameworkPropertyMetadata(string.Empty, null));
+        private static readonly DependencyProperty CompanyNameProperty = DependencyProperty.Register("CompanyName", typeof(string), MyType, new FrameworkPropertyMetadata(string.Empty, null));
+        private static readonly DependencyProperty DescriptionProperty = DependencyProperty.Register("Description", typeof(string), MyType, new FrameworkPropertyMetadata(string.Empty, null));
+        public static readonly RoutedCommand OkCommand = new RoutedCommand("OkCommand", MyType);
+
+        private string _Info = string.Empty;
+
+        public string Info
+        {
+            get
+            {
+                return _Info;
+            }
+            set
+            {
+                _Info = value;
+
+                if (!string.IsNullOrEmpty(_Info))
+                    SetValue(DescriptionProperty, $"{AssemblyDescription}\n{_Info.Trim()}");
+                else
+                    SetValue(DescriptionProperty, AssemblyDescription);
+            }
+        }
+
+        #region Assembly Attribute Accessors
+        public static string AssemblyTitle
+        {
+            get
+            {
+                var _Attributes_ = Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(AssemblyTitleAttribute), false);
+                if (_Attributes_.Length > 0)
+                {
+                    var _TitleAttribute_ = (AssemblyTitleAttribute)_Attributes_[0];
+                    if (!string.IsNullOrEmpty(_TitleAttribute_.Title))
+                        return _TitleAttribute_.Title;
+                }
+                return System.IO.Path.GetFileNameWithoutExtension(Assembly.GetExecutingAssembly().CodeBase);
+            }
+        }
+
+        public static string AssemblyVersion
+        {
+            get
+            {
+                return Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            }
+        }
+
+        public static string AssemblyDescription
+        {
+            get
+            {
+                var _Attributes_ = Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(AssemblyDescriptionAttribute), false);
+                if (_Attributes_.Length == 0)
+                    return "*** n/a ***";
+
+#if DEBUG
+                return $"DEBUG VERSION\n.net Version : {Environment.Version}\n\n{((AssemblyDescriptionAttribute)_Attributes_[0]).Description}";
+#else
+                return ((AssemblyDescriptionAttribute)_Attributes_[0]).Description;
+#endif
+            }
+        }
+
+        public static string AssemblyProduct
+        {
+            get
+            {
+                var _Attributes_ = Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(AssemblyProductAttribute), false);
+                if (_Attributes_.Length == 0)
+                    return "*** n/a ***";
+
+                return ((AssemblyProductAttribute)_Attributes_[0]).Product;
+            }
+        }
+
+        public static string AssemblyCopyright
+        {
+            get
+            {
+                var _Attributes_ = Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(AssemblyCopyrightAttribute), false);
+                if (_Attributes_.Length == 0)
+                    return "*** n/a ***";
+
+                return ((AssemblyCopyrightAttribute)_Attributes_[0]).Copyright;
+            }
+        }
+
+        public static string AssemblyCompany
+        {
+            get
+            {
+                var _Attributes_ = Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(AssemblyCompanyAttribute), false);
+                if (_Attributes_.Length == 0)
+                    return "*** n/a ***";
+
+                return ((AssemblyCompanyAttribute)_Attributes_[0]).Company;
+            }
+        }
+        #endregion
+
+        private void OKCommand_Executed(object sender, ExecutedRoutedEventArgs e)
+        {
+            Visibility = Visibility.Hidden;
+        }
+        #endregion
+
         private System.Windows.Forms.MenuItem _OnTop;
+        private bool _AllowClose;
 
         public MainWindow()
         {
+            InitializeComponent();
+
+            SetValue(ProductNameProperty, AssemblyProduct);
+            SetValue(VersionProperty, $"Version {AssemblyVersion}");
+            SetValue(CopyrightProperty, AssemblyCopyright);
+            SetValue(CompanyNameProperty, AssemblyCompany);
+            SetValue(DescriptionProperty, AssemblyDescription);
+
+            CommandBindings.Add(new CommandBinding(OkCommand, OKCommand_Executed));
+
+            Application.Current.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
             if (!CreateMutex())
                 Application.Current.Shutdown();
             else
@@ -18,6 +144,9 @@ namespace CopyTop
                 CreateNotifyIcon(CreateNotifyMenu());
                 CreateTimer();
             }
+
+            _AllowClose = false;
+            Closing += (sender, e) => { e.Cancel = !_AllowClose; Visibility = Visibility.Hidden; };
         }
 
         private static bool CreateMutex()
@@ -85,9 +214,10 @@ namespace CopyTop
         private System.Windows.Forms.ContextMenu CreateNotifyMenu()
         {
             var _trayMenu_ = new System.Windows.Forms.ContextMenu();
+
             _OnTop = _trayMenu_.MenuItems.Add("On Top", (sender, e) => { (sender as System.Windows.Forms.MenuItem).Checked = !(sender as System.Windows.Forms.MenuItem).Checked; });
             var _AutoStart_ = _trayMenu_.MenuItems.Add("Autostart", (sender, e) => { (sender as System.Windows.Forms.MenuItem).Checked = !(sender as System.Windows.Forms.MenuItem).Checked; RegistryTools.IsAutostart = (sender as System.Windows.Forms.MenuItem).Checked; });
-            _trayMenu_.MenuItems.Add("Exit", (sender, e) => { Application.Current.Shutdown(); });
+            _trayMenu_.MenuItems.Add("Exit", (sender, e) => { _AllowClose = true; Application.Current.Shutdown(); });
 
             _OnTop.Checked = true;
             _AutoStart_.Checked = RegistryTools.IsAutostart;
@@ -99,6 +229,7 @@ namespace CopyTop
         {
             var _TrayIcon_ = new System.Windows.Forms.NotifyIcon() { Visible = true, ContextMenu = Menu, Text = "CopyTop", };
             _TrayIcon_.Icon = new Icon(Application.GetResourceStream(new Uri("pack://application:,,,/CopyTop;component/Copy.ico")).Stream);
+            _TrayIcon_.DoubleClick += (sender, e) => { Visibility = Visibility.Visible; };
 
             Application.Current.Exit += (sender, e) => { _TrayIcon_.Visible = false; _TrayIcon_.Dispose(); };
         }
